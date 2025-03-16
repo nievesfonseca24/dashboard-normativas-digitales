@@ -863,7 +863,7 @@ with tab3:
                     )
                 )
                 
-                st.plot       
+                st.plotly_chart(fig_heatmap, use_container_width=True)      
 # Agregar footer con información
 st.markdown("---")
 st.caption("Dashboard de Normativas Digitales en la UE. Nieves Fonseca. © 2025")
