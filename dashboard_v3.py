@@ -3,10 +3,10 @@ import pandas as pd
 import plotly.express as px
 import networkx as nx
 import plotly.graph_objects as go
-from pathlib import Path
 import numpy as np
-import os
 from datetime import datetime
+import requests
+from io import BytesIO
 
 # Set page config once at the beginning
 st.set_page_config(
@@ -43,20 +43,34 @@ st.markdown("""
 # Configuración de la página principal
 st.title("📜 Dashboard de Normativas Digitales en la UE")
 
-# Path configuration with file uploader option
-def get_data_path():
-    # Opción para cargar archivo propio
-    uploaded_file = st.sidebar.file_uploader("Cargar archivo Excel", type=['xlsx'])
+# GitHub raw content URL (instead of using local path)
+def get_github_raw_url(github_url):
+    """Convert GitHub URL to raw content URL"""
+    if "github.com" in github_url:
+        # Convert GitHub URL to raw content URL
+        raw_url = github_url.replace("github.com", "raw.githubusercontent.com")
+        raw_url = raw_url.replace("/blob/", "/")
+        return raw_url
+    return github_url
+
+# Configuration with GitHub data source
+def get_data_source():
+    # Default GitHub URL
+    default_github_url = "https://github.com/nievesfonseca24/dashboard-normativas-digitales/blob/main/modulo3.xlsx"
+    
+    # Allow user to provide custom GitHub URL
+    github_url = st.sidebar.text_input(
+        "URL de GitHub del archivo Excel", 
+        value=default_github_url
+    )
+    
+    # Opción para cargar archivo propio (mantener esta funcionalidad)
+    uploaded_file = st.sidebar.file_uploader("O cargar archivo Excel local", type=['xlsx'])
     if uploaded_file is not None:
         return uploaded_file
     
-    # Path por defecto (intentar usar una ruta relativa)
-    default_path = Path("data/modulo3.xlsx")
-    if default_path.exists():
-        return default_path
-    
-    # Fallback a la ruta absoluta original
-    return Path(r"C:\Users\lujan\Desktop\PYTHON\normativa\Nueva carpeta\modulo3.xlsx")
+    # Usar URL de GitHub
+    return get_github_raw_url(github_url)
 
 # Mensaje de última actualización de datos
 def show_last_updated(data):
@@ -66,18 +80,24 @@ def show_last_updated(data):
     else:
         st.sidebar.caption(f"Última actualización: {datetime.now().strftime('%d/%m/%Y')}")
 
-# Load Excel file with better caching and error handling
+# Load Excel file with GitHub support and better caching
 @st.cache_data(ttl=3600)
-def load_excel_data(file_path):
+def load_excel_data(file_source):
     try:
-        if isinstance(file_path, Path):
-            if not file_path.exists():
-                st.error(f"El archivo no existe en la ruta: {file_path}")
+        # Check if file_source is a URL or uploaded file
+        if isinstance(file_source, str) and (file_source.startswith("http://") or file_source.startswith("https://")):
+            # Download file from URL
+            try:
+                response = requests.get(file_source)
+                response.raise_for_status()  # Raise exception for HTTP errors
+                file_content = BytesIO(response.content)
+                xls = pd.ExcelFile(file_content)
+            except requests.exceptions.RequestException as e:
+                st.error(f"Error al descargar el archivo desde GitHub: {e}")
                 return None
-            xls = pd.ExcelFile(file_path)
         else:
-            # Si es un archivo subido por el usuario
-            xls = pd.ExcelFile(file_path)
+            # Handle uploaded file
+            xls = pd.ExcelFile(file_source)
             
         # Verificar que las hojas necesarias existen
         required_sheets = ["Normativa", "Relaciones"]
@@ -112,11 +132,11 @@ def load_excel_data(file_path):
 
 # Load data with better error handling
 try:
-    file_path = get_data_path()
-    datos = load_excel_data(file_path)
+    file_source = get_data_source()
+    datos = load_excel_data(file_source)
     
     if datos is None:
-        st.error("No se pudieron cargar los datos. Por favor, revisa el archivo Excel.")
+        st.error("No se pudieron cargar los datos. Por favor, revisa el archivo Excel o la URL proporcionada.")
         st.stop()
         
     df_normativas = datos["Normativa"]
@@ -217,7 +237,7 @@ if search_term:
     
     df_filtrado = df_filtrado[search_mask['match']]
 
-# Crear tabs para mejor organización
+
 tab1, tab2, tab3 = st.tabs(["📊 Resumen", "📈 Evolución Temporal", "🔗 Relaciones"])
 
 # Tab 1: Panel de resumen
