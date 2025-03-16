@@ -56,7 +56,7 @@ def get_data_path():
         return default_path
     
     # Fallback a la ruta absoluta original
-    return Path(r"C:\Users\lujan\Desktop\PYTHON\normativa\modulo3.xlsx")
+    return Path(r"C:\Users\lujan\Desktop\PYTHON\normativa\Nueva carpeta\modulo3.xlsx")
 
 # Mensaje de última actualización de datos
 def show_last_updated(data):
